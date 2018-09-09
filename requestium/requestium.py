@@ -24,11 +24,12 @@ class Session(requests.Session):
     Some useful helper methods and object wrappings have been added.
     """
 
-    def __init__(self, webdriver_path, browser, default_timeout=5, webdriver_options={}):
+    def __init__(self, webdriver_path, browser, default_timeout=5, webdriver_options={}, desired_capabilities=None):
         super(Session, self).__init__()
         self.webdriver_path = webdriver_path
         self.default_timeout = default_timeout
         self.webdriver_options = webdriver_options
+        self.desired_capabilities = desired_capabilities
         self._driver = None
         self._last_requests_url = None
 
@@ -77,18 +78,31 @@ class Session(requests.Session):
         # TODO transfer of proxies and headers: Not supported by chromedriver atm.
         # Choosing not to use plug-ins for this as I don't want to worry about the
         # extra dependencies and plug-ins don't work in headless mode. :-(
-        chrome_options = webdriver.chrome.options.Options()
 
-        if 'binary_location' in self.webdriver_options:
-            chrome_options.binary_location = self.webdriver_options['binary_location']
+        if not isinstance(self.webdriver_options, webdriver.chrome.options.Options):
+            chrome_options = webdriver.chrome.options.Options()
 
-        if 'arguments' in self.webdriver_options:
-            if isinstance(self.webdriver_options['arguments'], list):
-                for arg in self.webdriver_options['arguments']:
-                    chrome_options.add_argument(arg)
-            else:
-                raise Exception('A list is needed to use \'arguments\' option. Found {}'.format(
-                    type(self.webdriver_options['arguments'])))
+            if 'binary_location' in self.webdriver_options:
+                chrome_options.binary_location = self.webdriver_options['binary_location']
+
+            if 'arguments' in self.webdriver_options:
+                if isinstance(self.webdriver_options['arguments'], list):
+                    for arg in self.webdriver_options['arguments']:
+                        chrome_options.add_argument(arg)
+                else:
+                    raise Exception('A list is needed to use \'arguments\' option. Found {}'.format(
+                        type(self.webdriver_options['arguments'])))
+        else:
+            # Already having options like we want to, skip the rest
+            chrome_options = self.webdriver_options
+
+        if self.desired_capabilities is not None:
+            return RequestiumChrome(
+                self.webdriver_path,
+                options=chrome_options,
+                desired_capabilities=self.desired_capabilities,
+                default_timeout=self.default_timeout
+            )
 
         # Create driver process
         return RequestiumChrome(self.webdriver_path,
